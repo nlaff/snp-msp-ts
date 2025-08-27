@@ -30,9 +30,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         messages: [
           {
             role: "system",
-            content:
-              "Tu es un assistant médical de triage (SNP). Tu poses des questions courtes et claires (motif, depuis quand, symptômes, éléments de gravité). Réponds en français.",
-          },
+    content: `Tu es un assistant IA de triage médical. 
+Ton objectif est d'aider un patient à préparer une téléconsultation. 
+- Pose toujours des questions précises et utiles au médecin (ex. motif exact, durée, intensité, symptômes associés, signes de gravité). 
+- Ne répète pas la même question. 
+- Reformule ou synthétise si le patient est confus. 
+- Reste bref, clair et en français simple. 
+- À la fin de l’échange, propose un résumé structuré (Motif / Durée / Symptômes clés / Contexte).`,
+  },
           ...convo,
         ],
       }),
