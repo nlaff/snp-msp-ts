@@ -68,59 +68,80 @@ const res = await fetch("/api/chat", {
   }
 
   return (
-    <div className="container">
-      <div className="header">
-        <div className="logo">
-          <img src="/Logo_MSP.png" alt="Logo MSP St. Martin sur le Pré" />
-        </div>
-        <div>
-          <h1>MSP St. Martin sur le Pré – Assistant SNP</h1>
-          <p className="subtitle">
-            Parcours d’accès rapide aux soins non programmés — téléconsultation régulatrice & suivi.
-          </p>
-        </div>
+  <div className="container">
+    <div className="header">
+      <div className="logo">
+        <img src="/Logo_MSP.png" alt="Logo MSP St. Martin sur le Pré" />
       </div>
-
-      <div className="card">
-        <label>
-          <input
-            type="checkbox"
-            checked={consent}
-            onChange={(e) => setConsent(e.target.checked)}
-          />{" "}
-          J’accepte que mes données soient transmises pour préparer la consultation
-        </label>
-
-        <div className="messages">
-          {messages.map((m, i) => (
-            <div key={i} className={m.role}>
-              <b>{m.role === "user" ? "Vous" : "Assistant"}</b>: {m.content}
-            </div>
-          ))}
-          <div ref={endRef} />
-        </div>
-
-        {!final && (
-          <>
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Expliquez votre situation..."
-            />
-            <button onClick={() => sendMessage()} disabled={loading}>
-              {loading ? "Envoi..." : "Envoyer"}
-            </button>
-          </>
-        )}
-
-        {final && (
-          <div className="summary">
-            <h3>Synthèse générée</h3>
-            <pre>{JSON.stringify(final, null, 2)}</pre>
-          </div>
-        )}
+      <div>
+        <h1>MSP St. Martin sur le Pré – Assistant SNP</h1>
+        <p className="subtitle">
+          Parcours d’accès rapide aux soins non programmés — téléconsultation régulatrice & suivi.
+        </p>
       </div>
     </div>
-  );
-}
+
+    <div className="card">
+      <label>
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+        />{" "}
+        J’accepte que mes données soient transmises pour préparer la consultation
+      </label>
+
+      <div className="messages">
+        {messages.map((m, i) => (
+          <div key={i} className={m.role}>
+            <b>{m.role === "user" ? "Vous" : "Assistant"}</b>: {m.content}
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+
+      {!final && (
+        <>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Expliquez votre situation..."
+          />
+          <button onClick={() => sendMessage()} disabled={loading}>
+            {loading ? "Envoi..." : "Envoyer"}
+          </button>
+        </>
+      )}
+
+      {final && (
+        <div className="summary">
+          <h3>Synthèse générée</h3>
+          <pre>{JSON.stringify(final, null, 2)}</pre>
+        </div>
+      )}
+    </div>
+
+    {/* Styles spécifiques */}
+    <style jsx>{`
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 16px;
+      }
+      .logo {
+        width: 72px;
+        height: 72px;
+        border-radius: 12px;
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+      .logo img {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+      }
+    `}</style>
+  </div>
+);
