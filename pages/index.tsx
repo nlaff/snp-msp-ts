@@ -23,14 +23,19 @@ export default function Home() {
     if (!content) return;
 
     setLoading(true);
-    setMessages((prev) => [...prev, { role: "user", content }]);
-    setInput("");
+setInput("");
 
-    const res = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: [...messages, { role: "user", content }] }),
-    });
+let outgoing: Msg[] = [];
+setMessages(prev => {
+  outgoing = [...prev, { role: "user", content }];
+  return outgoing;
+});
+
+const res = await fetch("/api/chat", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ messages: outgoing }),
+});
 
     const data = await res.json();
     setLoading(false);
