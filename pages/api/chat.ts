@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
+            body: JSON.stringify({
         model: "gpt-4o-mini",
         temperature: 0.3,
         messages: [
@@ -40,55 +40,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             ].join("\n"),
           },
 
-          // FEW-SHOT 1 — Adulte fièvre/rhino (progression sans répétition)
-          {
-            role: "user",
-            content: "J’ai de la fièvre et le nez qui coule.",
-          },
-          {
-            role: "assistant",
-            content: "Depuis quand ? Avez-vous mesuré la température ?",
-          },
-          {
-            role: "user",
-            content: "Depuis 2 jours, 39°C hier soir.",
-          },
-          {
-            role: "assistant",
-            content:
-              "Merci. Avez-vous d’autres symptômes (toux, mal de gorge, douleurs) ? Des signes de gravité (difficulté à respirer, confusion, raideur de nuque) ?",
-          },
+          { role: "user", content: "J’ai de la fièvre et le nez qui coule." },
+          { role: "assistant", content: "Depuis quand ? Avez-vous mesuré la température ?" },
+          { role: "user", content: "Depuis 2 jours, 39°C hier soir." },
+          { role: "assistant", content: "Merci. Avez-vous d’autres symptômes (toux, mal de gorge, douleurs) ? Des signes de gravité (difficulté à respirer, confusion, raideur de nuque) ?" },
 
-          // FEW-SHOT 2 — Enfant rhino/fièvre
-          {
-            role: "user",
-            content: "Rhino chez ma fille de 4 ans.",
-          },
-          {
-            role: "assistant",
-            content:
-              "Depuis quand ? Quelle température maximale ? Son état général est-il conservé (elle boit/joue/respire bien) ?",
-          },
+          { role: "user", content: "Rhino chez ma fille de 4 ans." },
+          { role: "assistant", content: "Depuis quand ? Quelle température maximale ? Son état général est-il conservé (elle boit/joue/respire bien) ?" },
 
-          // FEW-SHOT 3 — Anti-répétition explicite
-          {
-            role: "user",
-            content: "Mal de gorge depuis 3 jours, 38.5°C.",
-          },
-          {
-            role: "assistant",
-            content:
-              "Merci. Avez-vous des plaques dans la gorge, des ganglions OU de la toux ?",
-          },
-          {
-            role: "user",
-            content: "Pas de plaques ni de ganglions.",
-          },
-          {
-            role: "assistant",
-            content:
-              "Bien noté. Avez-vous de la toux, une difficulté à avaler, ou un essoufflement ? (Je ne repose pas les questions déjà traitées.)",
-          },
+          { role: "user", content: "Mal de gorge depuis 3 jours, 38.5°C." },
+          { role: "assistant", content: "Merci. Avez-vous des plaques dans la gorge, des ganglions OU de la toux ?" },
+          { role: "user", content: "Pas de plaques ni de ganglions." },
+          { role: "assistant", content: "Bien noté. Avez-vous de la toux, une difficulté à avaler, ou un essoufflement ? (Je ne repose pas les questions déjà traitées.)" },
 
           // Conversation réelle
           ...convo,
@@ -97,7 +60,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (!response.ok) {
-      // Ne pas exposer les détails en prod; message patient-safe
       return res.status(200).json({
         reply:
           "Erreur technique. Si urgence, appelez le 15. Sinon, précisez: depuis quand, température, et 2 symptômes clés.",
