@@ -1,19 +1,19 @@
+// pages/index.tsx
 import { useEffect, useRef, useState } from "react";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 export default function Home() {
   const [consent, setConsent] = useState(false);
-  const [started, setStarted] = useState(false); // <- démarre l'UI de chat
+  const [started, setStarted] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
-  const [final, setFinal] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, final]);
+  }, [messages]);
 
   async function sendMessage(text?: string) {
     if (!consent) {
@@ -26,7 +26,7 @@ export default function Home() {
     setLoading(true);
     setInput("");
 
-    // On calcule la conversation à envoyer à partir du dernier état
+    // Construire la conversation la plus fraîche
     let outgoing: Msg[] = [];
     setMessages((prev) => {
       outgoing = [...prev, { role: "user", content }];
@@ -40,26 +40,12 @@ export default function Home() {
     });
 
     const data = await res.json();
+    const reply: string =
+      (typeof data?.reply === "string" ? data.reply : "").trim() ||
+      "Je n’ai pas compris. Motif, depuis quand, symptômes clés ?";
+
+    setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     setLoading(false);
-
-    if (data?.ask) {
-      setMessages((prev) => [...prev, { role: "assistant", content: data.ask }]);
-      return;
-    }
-
-    if (data?.final) {
-      setFinal(data.final);
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: "Merci, j’ai tout ce qu’il faut. Je prépare votre résumé…" },
-      ]);
-      return;
-    }
-
-    setMessages((prev) => [
-      ...prev,
-      { role: "assistant", content: "Je n’ai pas bien compris. Motif, depuis quand et symptômes clés ?" },
-    ]);
   }
 
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -71,7 +57,7 @@ export default function Home() {
 
   return (
     <div className="page">
-      {/* Bannière / entête */}
+      {/* Bannière */}
       <section className="banner card">
         <div className="logoBox">
           <img src="/Logo_MSP.png" alt="Logo MSP" />
@@ -92,7 +78,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Encadré consentement */}
+      {/* Consentement */}
       <section className="card">
         <h3>Avant de commencer</h3>
         <label className="consent">
@@ -109,7 +95,7 @@ export default function Home() {
         </label>
       </section>
 
-      {/* Choix du mode (audio placeholder / chat actif) */}
+      {/* Choix du mode */}
       {!started && (
         <section className="card">
           <h3>Comment souhaitez-vous démarrer ?</h3>
@@ -137,7 +123,7 @@ export default function Home() {
         </section>
       )}
 
-      {/* Zone de chat */}
+      {/* Chat */}
       {started && (
         <section className="card">
           <h3>Assistant</h3>
@@ -151,26 +137,17 @@ export default function Home() {
             <div ref={endRef} />
           </div>
 
-          {!final && (
-            <div className="composer">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Expliquez votre situation (motif, depuis quand, symptômes)…"
-              />
-              <button className="btn solid" onClick={() => sendMessage()} disabled={loading}>
-                {loading ? "Envoi..." : "Envoyer"}
-              </button>
-            </div>
-          )}
-
-          {final && (
-            <div className="summary">
-              <h4>Synthèse générée</h4>
-              <pre>{JSON.stringify(final, null, 2)}</pre>
-            </div>
-          )}
+          <div className="composer">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Expliquez votre situation (motif, depuis quand, symptômes)…"
+            />
+            <button className="btn solid" onClick={() => sendMessage()} disabled={loading}>
+              {loading ? "Envoi..." : "Envoyer"}
+            </button>
+          </div>
         </section>
       )}
 
@@ -185,11 +162,7 @@ export default function Home() {
           color: #1f2a30;
           font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
         }
-        .page {
-          max-width: 980px;
-          margin: 24px auto 48px;
-          padding: 0 16px;
-        }
+        .page { max-width: 980px; margin: 24px auto 48px; padding: 0 16px; }
         .card {
           background: #fff;
           border: 1px solid rgba(31, 42, 48, 0.08);
@@ -199,7 +172,6 @@ export default function Home() {
           margin-bottom: 16px;
         }
 
-        /* Bannière */
         .banner {
           display: grid;
           grid-template-columns: 88px 1fr;
@@ -209,131 +181,41 @@ export default function Home() {
           border-color: rgba(43, 138, 132, 0.25);
         }
         .logoBox {
-          width: 88px;
-          height: 88px;
-          border-radius: 16px;
-          overflow: hidden;
-          background: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
+          width: 88px; height: 88px; border-radius: 16px; overflow: hidden;
+          background: #fff; display: flex; align-items: center; justify-content: center;
           border: 1px solid rgba(31, 42, 48, 0.06);
         }
-        .logoBox img {
-          max-width: 100%;
-          max-height: 100%;
-          display: block;
-        }
-        .headline h1 {
-          font-size: 22px;
-          margin: 0 0 4px;
-          line-height: 1.2;
-        }
-        .sub {
-          margin: 0 0 8px;
-          color: #51626a;
-        }
+        .logoBox img { max-width: 100%; max-height: 100%; display: block; }
+        .headline h1 { font-size: 22px; margin: 0 0 4px; line-height: 1.2; }
+        .sub { margin: 0 0 8px; color: #51626a; }
         .palette { display: flex; gap: 6px; }
-        .sw {
-          width: 16px;
-          height: 10px;
-          border-radius: 4px;
-          display: inline-block;
-        }
+        .sw { width: 16px; height: 10px; border-radius: 4px; display: inline-block; }
 
-        /* Consentement */
-        .consent {
-          display: flex;
-          align-items: flex-start;
-          gap: 10px;
-          line-height: 1.5;
-          color: #2a363c;
-        }
-        .consent input {
-          margin-top: 3px;
-          transform: scale(1.15);
-        }
+        .consent { display: flex; align-items: flex-start; gap: 10px; line-height: 1.5; color: #2a363c; }
+        .consent input { margin-top: 3px; transform: scale(1.15); }
 
-        /* Boutons */
         .btnRow { display: flex; gap: 10px; }
-        .btn {
-          border-radius: 10px;
-          padding: 10px 14px;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 14px;
-        }
+        .btn { border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
         .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-        .btn.solid {
-          background: #2b8a84;
-          color: #fff;
-          border: 1px solid #257a75;
-        }
+        .btn.solid { background: #2b8a84; color: #fff; border: 1px solid #257a75; }
         .btn.solid:hover { filter: brightness(0.98); }
-        .btn.outline {
-          background: #fff;
-          color: #2b3e42;
-          border: 1px solid rgba(31,42,48,0.15);
-        }
-        .hint {
-          color: #6a7b84;
-          margin-top: 8px;
-          font-size: 14px;
-        }
+        .btn.outline { background: #fff; color: #2b3e42; border: 1px solid rgba(31,42,48,0.15); }
+        .hint { color: #6a7b84; margin-top: 8px; font-size: 14px; }
 
-        /* Chat */
-        .messages {
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-          margin: 10px 0 12px;
-          max-height: 360px;
-          overflow: auto;
-        }
+        .messages { display: flex; flex-direction: column; gap: 10px; margin: 10px 0 12px; max-height: 360px; overflow: auto; }
         .msg { display: grid; grid-template-columns: 88px 1fr; align-items: start; gap: 10px; }
         .author { font-weight: 700; color: #51626a; }
-        .bubble {
-          background: #f3f6f7;
-          border: 1px solid rgba(31,42,48,0.08);
-          border-radius: 12px;
-          padding: 10px 12px;
-          white-space: pre-wrap;
-        }
+        .bubble { background: #f3f6f7; border: 1px solid rgba(31,42,48,0.08); border-radius: 12px; padding: 10px 12px; white-space: pre-wrap; }
         .msg.user .author { color: #2b3e42; }
         .msg.user .bubble { background: #eef6f5; border-color: rgba(43,138,132,0.25); }
 
-        .composer {
-          display: grid;
-          grid-template-columns: 1fr auto;
-          gap: 10px;
-          align-items: start;
-        }
+        .composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: start; }
         textarea {
-          width: 100%;
-          min-height: 82px;
-          resize: vertical;
-          border-radius: 10px;
-          border: 1px solid rgba(31,42,48,0.15);
-          padding: 10px 12px;
-          font-size: 15px;
+          width: 100%; min-height: 82px; resize: vertical; border-radius: 10px;
+          border: 1px solid rgba(31,42,48,0.15); padding: 10px 12px; font-size: 15px;
         }
 
-        /* Synthèse */
-        .summary pre {
-          background: #0b0f12;
-          color: #eaeef2;
-          padding: 12px;
-          border-radius: 10px;
-          overflow: auto;
-          font-size: 13px;
-        }
-
-        .footer {
-          margin: 18px 4px 0;
-          color: #85939a;
-          font-size: 13px;
-          text-align: center;
-        }
+        .footer { margin: 18px 4px 0; color: #85939a; font-size: 13px; text-align: center; }
 
         @media (max-width: 560px) {
           .banner { grid-template-columns: 64px 1fr; }
