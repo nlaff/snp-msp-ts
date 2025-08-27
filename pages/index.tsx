@@ -40,12 +40,33 @@ export default function Home() {
     });
 
     const data = await res.json();
-    const reply: string =
-      (typeof data?.reply === "string" ? data.reply : "").trim() ||
-      "Je n’ai pas compris. Motif, depuis quand, symptômes clés ?";
 
-    setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
-    setLoading(false);
+// helper pour extraire la synthèse JSON si elle existe
+function extractSynthesis(text: string) {
+  const start = text.indexOf("<<<SYNTH>>>");
+  const end = text.indexOf("<<<END>>>");
+  if (start === -1 || end === -1) return null;
+  const jsonStr = text.slice(start + "<<<SYNTH>>>".length, end).trim();
+  try {
+    return JSON.parse(jsonStr);
+  } catch {
+    return null;
+  }
+}
+
+const content: string =
+  (typeof data?.content === "string" ? data.content : "").trim() ||
+  "Je n’ai pas compris. Motif, depuis quand, symptômes clés ?";
+
+// vérifier s’il y a une synthèse
+const synth = extractSynthesis(content);
+if (synth?.ready) {
+  setFinal(synth); // <- tu as déjà final dans ton front pour l’affichage
+}
+
+// nettoyer le texte pour le chat (supprimer le bloc JSON éventuel)
+const clean = content.replace(/<<<SYNTH>>>(.|\n|\r)*?<<<END>>>/g, "").trim();*
+
   }
 
   function handleKey(e: React.KeyboardEvent<HTMLTextAreaElement>) {
