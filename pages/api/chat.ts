@@ -1,137 +1,106 @@
 // pages/api/chat.ts
 import type { NextApiRequest, NextApiResponse } from "next";
 
-// --- petits utilitaires de parsing ----------------------------------------------------------------
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY!;
+const MODEL = "gpt-4o-mini";
 
-function normalize(txt: string) {
-  return txt
-    .toLowerCase()
-    .replace(/[àáâãä]/g, "a")
-    .replace(/[èéêë]/g, "e")
-    .replace(/[îï]/g, "i")
-    .replace(/[ôö]/g, "o")
-    .replace(/[ùü]/g, "u");
-}
-
-function extractTemp(all: string): number | null {
-  // 39 / 39.5 / 39,2 / 39° / 39.2°C
-  const m = all.match(/(\d{2}(?:[.,]\d)?)\s*°?\s*c?/i);
-  if (!m) return null;
-  const n = parseFloat(m[1].replace(",", "."));
-  if (n >= 34 && n <= 43) return n;
-  return null;
-}
-
-function extractDays(all: string): number | null {
-  // "2 jours", "depuis 3 j", "3j", "4 jours", "48h" (≈2 jours)
-  const mDays = all.match(/(\d+)\s*(?:j|jour|jours)\b/i);
-  if (mDays) return parseInt(mDays[1], 10);
-  const mHours = all.match(/(\d+)\s*(?:h|heures?)/i);
-  if (mHours) return Math.round(parseInt(mHours[1], 10) / 24);
-  return null;
-}
-
-const SYMPTOMS = [
-  "toux",
-  "nez qui coule",
-  "rhinite",
-  "rhume",
-  "maux de gorge",
-  "mal a la gorge",
-  "plaques dans la gorge",
-  "ganglions",
-  "douleurs musculaires",
-  "courbatures",
-  "maux de tete",
-  "cephalee",
-  "vomissements",
-  "diarrhee",
-  "essoufflement",
-];
-
-function extractSymptoms(all: string): string[] {
-  const L = normalize(all);
-  const found = new Set<string>();
-  for (const s of SYMPTOMS) {
-    const n = normalize(s);
-    if (L.includes(n)) found.add(s);
-  }
-  return Array.from(found);
-}
-
-function hasMotif(all: string): boolean {
-  const L = normalize(all);
-  return (
-    L.includes("fievre") ||
-    L.includes("nez qui coule") ||
-    L.includes("nez") ||
-    L.includes("gorge") ||
-    L.includes("rhinite") ||
-    L.includes("rhume") ||
-    L.includes("toux") ||
-    L.includes("otite") ||
-    L.includes("diarrhee") ||
-    L.includes("vomissements") ||
-    L.includes("douleur")
-  );
-}
-
-// --- handler --------------------------------------------------------------------------------------
+type Msg = { role: "system" | "user" | "assistant"; content: string };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  if (!OPENAI_API_KEY) return res.status(500).json({ error: "Missing OPENAI_API_KEY" });
 
-  // Le front t’envoie { messages: [{role:"user"|"assistant", content:string}, ...] }
-  const body = req.body || {};
-  const messages: Array<{ role: "user" | "assistant"; content: string }> = body.messages || [];
-
-  // On lit les 6 derniers échanges pour extraire des infos globales
-  const recent = messages.slice(-6);
-  const allText = recent.map((m) => m.content).join("\n");
-
-  // extraction
-  const has_motif = hasMotif(allText);
-  const temp = extractTemp(allText);
-  const days = extractDays(allText);
-  const symptoms = extractSymptoms(allText);
-
-  // logique "une question à la fois"
-  let reply = "";
-
-  if (!has_motif) {
-    reply = "Quel est le motif de votre consultation (ex. fièvre, rhinite, toux, mal de gorge) ?";
-  } else if (temp === null && normalize(allText).includes("fievre")) {
-    reply =
-      "Merci. Avez-vous mesuré la température ? Si oui, quelle valeur (ex. 38.5°C) ? Sinon, dites juste « pas prise ».";
-  } else if (days === null) {
-    reply = "Depuis combien de temps cela dure-t-il (ex. 2 jours, 48h) ?";
-  } else if (symptoms.length === 0) {
-    reply =
-      "Quels sont vos 1 à 2 symptômes principaux associés (ex. nez qui coule, toux, maux de gorge, ganglions) ?";
-  } else {
-    // On a l'essentiel : motif présent, durée trouvée, ≥1 symptôme (et temp si fièvre)
-    const tempPart =
-      temp !== null ? `Température mesurée : ${temp.toFixed(1)}°C. ` : "";
-    reply =
-      `Parfait, j’ai bien noté. ${tempPart}Durée : ${days} jour(s). ` +
-      `Symptômes clés : ${symptoms.slice(0, 3).join(", ")}. ` +
-      `Si tout est correct, écrivez « synthèse » pour que je prépare le résumé pour le médecin.`;
+  const { messages } = req.body as { messages: Msg[] };
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "messages[] manquant" });
   }
 
-  // Si la personne tape "synthèse", on renvoie un petit JSON prêt à être affiché côté front
-  const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content || "";
-  if (normalize(lastUser).includes("synthese")) {
-    return res.status(200).json({
-      summary: {
-        motif_present: has_motif,
-        temperature_c: temp,
-        duree_jours: days,
-        symptomes: symptoms,
-        note: "Exemple de payload de synthèse (à pousser dans MadeForMed plus tard).",
+  // 1) Rôle (FR) : assistant de pré-triage pour la MSP
+  const SYSTEM_PROMPT: Msg = {
+    role: "system",
+    content: `
+Tu es un assistant d’accueil et de pré-triage pour la MSP « St. Martin sur le Pré ».
+Objectif : en 3 à 5 questions simples, comprendre le MOTIF, DEPUIS QUAND, les SYMPTÔMES CLÉS,
+et repérer les SIGNES DE GRAVITÉ. Une seule question à la fois. Style chaleureux, clair, vouvoiement.
+
+Rappels importants :
+- Tu n'établis pas de diagnostic médical. Tu aides à préparer une téléconsultation régulatrice.
+- Si des signes de gravité apparaissent, tu indiques immédiatement : "Ceci peut être urgent. Appelez le 15."
+  Signe(s) d’alerte (liste non exhaustive) : difficulté à respirer, douleur thoracique, confusion,
+  raideur de nuque, éruption purpurique, paralysie brutale, perte de connaissance, saignement abondant,
+  forte douleur abdominale persistante, fièvre > 40°C non améliorée, <3 mois avec fièvre, grossesse
+  + douleur/saignement, immunodépression + fièvre ou douleur intense.
+
+Champs à collecter :
+- motif (mots simples du patient)
+- début/durée (date/heure approx. ou "inconnu")
+- symptômes (liste courte)
+- contexte (ATCD/traitements/expositions)
+- facteurs_gravite (liste si présents)
+
+Quand tu estimes avoir assez d’éléments (motif + début/durée + ≥2 symptômes ou contexte utile),
+tu produis une SYNTHÈSE JSON, encadrée par les balises EXACTES :
+<<<SYNTH>>>
+{ ...json... }
+<<<END>>>
+
+Format JSON attendu (exemple) :
+{
+  "ready": true,
+  "patient_text": "reformulation courte et fidèle",
+  "resume": {
+    "motif": "fièvre et nez qui coule",
+    "debut": "depuis 2 jours",
+    "duree": "2 jours",
+    "symptomes": ["fièvre 39°C", "nez qui coule", "mal de gorge"],
+    "contexte": "enfant 4 ans, pas d’allergie connue",
+    "facteurs_gravite": []
+  },
+  "orientation": "teleconsultation_regulatrice", // ou: "autosoins", "consultation_rapidement", "urgence_15"
+  "prediagnostics": [
+    {"label":"Rhinopharyngite virale","prob":0.55},
+    {"label":"Grippe","prob":0.20}
+  ]
+}
+
+Règles d’émission :
+- Tant que tu n’as pas assez d’info : poursuis la conversation normalement (une question claire).
+- Quand tu es prêt : réponds d’abord en français simple (2-3 phrases max), puis ajoute le bloc JSON entre
+  <<<SYNTH>>> et <<<END>>>. Ne mets pas d’autres balises, pas de Markdown autour du JSON.
+- N’écris JAMAIS de diagnostic ferme ni de prescription.
+- Toujours rester poli, rassurant, et factuel.
+`.trim(),
+  };
+
+  // 2) On envoie l’historique complet : system + tout ce que le front a accumulé
+  const payload = {
+    model: MODEL,
+    temperature: 0.4,
+    max_tokens: 500,
+    messages: [SYSTEM_PROMPT, ...messages],
+  };
+
+  try {
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify(payload),
     });
-  }
 
-  // réponse "assistant" classique
-  return res.status(200).json({ reply });
+    if (!r.ok) {
+      const t = await r.text();
+      return res.status(500).json({ error: "OpenAI error", detail: t });
+    }
+
+    const data = await r.json();
+    const content = data?.choices?.[0]?.message?.content ?? "";
+
+    // On renvoie simplement le texte de l’assistant (qui peut éventuellement contenir la synthèse JSON)
+    return res.status(200).json({ role: "assistant", content });
+  } catch (e: any) {
+    return res.status(500).json({ error: e?.message ?? "Unknown error" });
+  }
 }
