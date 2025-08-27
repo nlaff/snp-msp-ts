@@ -63,10 +63,12 @@ function hasMotif(all: string): boolean {
   const L = normalize(all);
   return (
     L.includes("fievre") ||
+    L.includes("nez qui coule") ||
+    L.includes("nez") ||
+    L.includes("gorge") ||
     L.includes("rhinite") ||
     L.includes("rhume") ||
     L.includes("toux") ||
-    L.includes("gorge") ||
     L.includes("otite") ||
     L.includes("diarrhee") ||
     L.includes("vomissements") ||
