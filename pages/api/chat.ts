@@ -9,16 +9,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { messages } = req.body as { messages?: Msg[] };
+    const { messages } = (req.body ?? {}) as { messages?: Msg[] };
     const convo: Msg[] = Array.isArray(messages) ? messages : [];
-
-    // Sécurité : limite simple
-    if (convo.length > 20) {
-      return res.status(200).json({
-        reply:
-          "Merci. Pour continuer, résumez en une phrase : motif, depuis quand, 2 symptômes clés.",
-      });
-    }
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -34,30 +26,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             role: "system",
             content: [
               "Tu es un assistant IA de TRIAGE médical (Soins Non Programmés).",
-              "Objectif: préparer la téléconsultation en 2–4 questions maximum puis proposer un mini-résumé.",
-              "",
-              "RÈGLES STRICTES:",
-              "1) NE REPOSE JAMAIS une question déjà posée OU à laquelle le patient a déjà répondu.",
-              "2) Si le motif est déjà donné (ex: fièvre + nez qui coule), NE REDEMANDE PAS 'Quel est le motif'. Avance (durée, mesure T°, symptômes associés, signes de gravité).",
-              "3) Pose 1 à 2 questions courtes à la fois. Français simple.",
-              "4) Enfant: âge, état général (boit/joue/respire), tolérance (antalgique, hydratation).",
-              "5) Demande les signes de gravité une seule fois (dyspnée, confusion, raideur de nuque, douleur thoracique, déshydratation...). Si oui → 'Si urgence, appelez le 15.'",
-              "6) Quand assez d’infos, fournis une synthèse en 4 lignes : Motif / Durée / Mesures & symptômes clés / Gravité oui/non.",
+              "Objectif: en 2–4 questions max, collecter: durée, mesures (ex: température), symptômes associés, signes de gravité.",
+              "Règles:",
+              "- NE REPOSE JAMAIS une question déjà posée ou déjà répondue.",
+              "- Si le motif est donné, ne le redemande pas; avance vers durée/mesure/symptômes/gravité.",
+              "- Questions courtes, 1–2 à la fois, français simple.",
+              "- Enfant: âge, état général (boit/joue/respire), tolérance (antalgique/hydratation).",
+              "- Si signes de gravité → rappeler d’appeler le 15.",
             ].join("\n"),
           },
-
-          // Micro-priming (Q/R ultra courtes pour pousser le modèle à avancer)
-          { role: "user", content: "J’ai de la fièvre et le nez qui coule." },
-          { role: "assistant", content: "Depuis quand ? Température mesurée ?" },
-          { role: "user", content: "Depuis 2 jours, 39°C hier soir." },
-          {
-            role: "assistant",
-            content:
-              "Merci. Un autre symptôme marquant (toux, mal de gorge, douleurs) ? Un signe de gravité (difficulté à respirer, confusion) ?",
-          },
-
-          // Conversation réelle envoyée par l’UI
-          ...convo,
+          ...convo
         ],
       }),
     });
